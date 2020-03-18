@@ -1,0 +1,230 @@
+diff --git a/configure b/configure
+index 29bd633d34..3058452873 100755
+--- a/configure
++++ b/configure
+@@ -1736,6 +1736,7 @@ enable_cmd
+ enable_conhost
+ enable_control
+ enable_cscript
++enable_discord
+ enable_dism
+ enable_dpnsvr
+ enable_dxdiag
+@@ -21218,6 +21219,7 @@ wine_fn_config_makefile programs/cmd/tests enable_tests
+ wine_fn_config_makefile programs/conhost enable_conhost
+ wine_fn_config_makefile programs/control enable_control
+ wine_fn_config_makefile programs/cscript enable_cscript
++wine_fn_config_makefile programs/discord enable_discord
+ wine_fn_config_makefile programs/dism enable_dism
+ wine_fn_config_makefile programs/dpnsvr enable_dpnsvr
+ wine_fn_config_makefile programs/dxdiag enable_dxdiag
+diff --git a/configure.ac b/configure.ac
+index f7c1b7920e..4161c70231 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -3937,6 +3937,7 @@ WINE_CONFIG_MAKEFILE(programs/cmd/tests)
+ WINE_CONFIG_MAKEFILE(programs/conhost)
+ WINE_CONFIG_MAKEFILE(programs/control)
+ WINE_CONFIG_MAKEFILE(programs/cscript)
++WINE_CONFIG_MAKEFILE(programs/discord)
+ WINE_CONFIG_MAKEFILE(programs/dism)
+ WINE_CONFIG_MAKEFILE(programs/dpnsvr)
+ WINE_CONFIG_MAKEFILE(programs/dxdiag)
+diff --git a/programs/discord/Makefile.in b/programs/discord/Makefile.in
+new file mode 100644
+index 0000000000..da87f75cd7
+--- /dev/null
++++ b/programs/discord/Makefile.in
+@@ -0,0 +1,3 @@
++MODULE  = discord.exe
++APPMODE = -mwindows
++C_SRCS = discord.c
+diff --git a/programs/discord/discord.c b/programs/discord/discord.c
+new file mode 100644
+index 0000000000..546e972554
+--- /dev/null
++++ b/programs/discord/discord.c
+@@ -0,0 +1,139 @@
++/* a discord stub, to redirect reads/writes to/from the unix side. */
++/* do not compile with msvcrt, as this requires getenv from unix libc and AF_UNIX sockets */
++
++#include "wine/debug.h"
++
++#include <windef.h>
++#include <winbase.h>
++#include <synchapi.h>
++
++#include <stdlib.h>
++#include <string.h>
++#include <sys/types.h>
++#include <sys/socket.h>
++#include <sys/un.h>
++#include <fcntl.h>
++#include <unistd.h>
++#include <errno.h>
++#include <signal.h>
++
++extern HANDLE CDECL __wine_make_process_system(void);
++
++WINE_DEFAULT_DEBUG_CHANNEL(discord);
++
++static const char *get_temp_path(void)
++{
++	const char *result = getenv("XDG_RUNTIME_DIR");
++	if (!result)
++		result = getenv("TEMP");
++	if (!result)
++		result = getenv("TMP");
++	if (!result)
++		result = getenv("TMPDIR");
++	if (!result)
++		result = "/tmp";
++	return result;
++}
++
++static void sigpipe_handler(int i)
++{
++	(void)i;
++}
++
++int CDECL main(void)
++{
++	static const WCHAR discord_ipc_pipe_nameW[] = {'\\','\\','.','\\','p','i','p','e','\\','d','i','s','c','o','r','d','-','i','p','c','-','0',0};
++	HANDLE exit_event;
++	DWORD bytes_avail, bytes_read;
++	ssize_t fd_read;
++	char buf[65536];
++	int optval = sizeof(buf);
++
++	/* the interfaces to and from unix side */
++	HANDLE pipe = INVALID_HANDLE_VALUE;
++	int fd = -1;
++
++	struct sockaddr_un sun;
++
++	WINE_TRACE("starting discord-ipc-0 emulation\n");
++
++	exit_event = __wine_make_process_system();
++
++	memset(&sun, 0, sizeof(sun));
++	sun.sun_family = AF_UNIX;
++
++	signal(SIGPIPE, sigpipe_handler);
++
++	while (1) {
++		if (WaitForSingleObject(exit_event, 10) != WAIT_TIMEOUT)
++			break;
++
++		if (fd == -1) {
++			if ((fd = socket(AF_UNIX, SOCK_STREAM, 0)) == -1)
++				continue;
++
++			fcntl(fd, F_SETFL, O_NONBLOCK);
++
++			setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &optval, sizeof(int));
++			setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &optval, sizeof(int));
++
++			strcpy(sun.sun_path, get_temp_path());
++			strcat(sun.sun_path, "/discord-ipc-0");
++
++retry_connection:
++			if (connect(fd, (const struct sockaddr *)&sun, sizeof(sun)) == -1) {
++				SleepEx(1000, 0);
++				goto retry_connection;
++			}
++
++			if ((pipe = CreateNamedPipeW(discord_ipc_pipe_nameW,
++					PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
++					PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_NOWAIT,
++					1,
++					sizeof(buf),
++					sizeof(buf),
++					0,
++					NULL)) == INVALID_HANDLE_VALUE) {
++				close(fd);
++
++				/* another instance exists */
++				return 1;
++			}
++		}
++
++		if (PeekNamedPipe(pipe, NULL, 0, NULL, &bytes_avail, NULL)) {
++			if (ReadFile(pipe, buf, sizeof(buf), &bytes_read, NULL)) {
++				if (send(fd, buf, bytes_read, 0) == -1) {
++disconnected_from_unix:
++					WINE_TRACE("disconnected? attempt to reconnect\n");
++
++					CloseHandle(pipe);
++					pipe = INVALID_HANDLE_VALUE;
++
++					goto retry_connection;
++				}
++			}
++		}
++
++		if ((fd_read = recv(fd, buf, sizeof(buf), 0)) > 0) {
++			WriteFile(pipe, buf, fd_read, &bytes_read, NULL);
++		} else {
++			if (errno == EAGAIN || errno == EWOULDBLOCK)
++				continue;
++
++			goto disconnected_from_unix;
++		}
++	}
++
++	WINE_TRACE("closing up\n");
++
++	if (pipe != INVALID_HANDLE_VALUE)
++		CloseHandle(pipe);
++
++	if (fd != -1)
++		close(fd);
++
++	CloseHandle(exit_event);
++
++	return 0;
++}
+diff --git a/programs/wineboot/wineboot.c b/programs/wineboot/wineboot.c
+index 24d1edb26b..0891405cf1 100644
+--- a/programs/wineboot/wineboot.c
++++ b/programs/wineboot/wineboot.c
+@@ -1039,6 +1039,31 @@ static BOOL start_services_process(void)
+     return TRUE;
+ }
+ 
++/* for discord-ipc-0 emulation */
++static BOOL start_discord_process(void)
++{
++    static const WCHAR discord[] = {'\\','d','i','s','c','o','r','d','.','e','x','e',0};
++    PROCESS_INFORMATION pi;
++    STARTUPINFOW si;
++    WCHAR path[MAX_PATH];
++
++    if (!GetSystemDirectoryW(path, MAX_PATH - lstrlenW(discord)))
++        return FALSE;
++    lstrcatW(path, discord);
++    ZeroMemory(&si, sizeof(si));
++    si.cb = sizeof(si);
++    if (!CreateProcessW(path, path, NULL, NULL, TRUE, DETACHED_PROCESS, NULL, NULL, &si, &pi))
++    {
++        WINE_ERR("Couldn't start discord.exe: error %u\n", GetLastError());
++        return FALSE;
++    }
++
++    CloseHandle(pi.hThread);
++    CloseHandle(pi.hProcess);
++
++    return TRUE;
++}
++
+ static INT_PTR CALLBACK wait_dlgproc( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
+ {
+     switch (msg)
+@@ -1476,6 +1501,7 @@ int __cdecl main( int argc, char *argv[] )
+     {
+         ProcessRunKeys( HKEY_LOCAL_MACHINE, RunServicesW, FALSE, FALSE );
+         start_services_process();
++        start_discord_process();
+     }
+     if (init || update) update_wineprefix( update );
+ 
