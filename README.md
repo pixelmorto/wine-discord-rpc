@@ -10,13 +10,14 @@ The program also makes itself a Wine system process, so it closes out automatica
 
 ## Compilation
 
-Compile using winegcc or patch into a Wine source tree using discord.patch.
+Compile using winegcc or patch into a Wine source tree using discord.patch and compile.
 
 ## How to use
 
 This is meant to be integrated into a Wine source tree with a patch, so it is built with wine and wineboot can launch the program.
 
-However, the program can be ran before the game as an add-on like so: ```
+However, the program can be ran before the game as an add-on like so:
+```
 wine discord.exe.so && wine game_exe_here.exe
 ```
 
