@@ -18,9 +18,9 @@ To create the patch, use a Wine git source tree and rebase the patch.
 
 This is meant to be integrated into a Wine source tree with a patch, so it is built with wine and wineboot can launch the program.
 
-However, the program can be ran before the game as an add-on like so:
+However, the program can be ran with a program like so:
 ```
-wine discord.exe.so && wine game_exe_here.exe
+wine discord.exe.so & wine game_exe_here.exe
 ```
 
 ## Improvements
