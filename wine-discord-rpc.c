@@ -1,4 +1,4 @@
-/* a discord stub, to redirect reads/writes to/from the unix side. */
+/* redirect reads/writes to/from the unix side. */
 /* do not compile with msvcrt, as this requires getenv from unix libc and AF_UNIX sockets */
 
 #include "wine/debug.h"
@@ -64,6 +64,7 @@ int CDECL main(void)
 
 	signal(SIGPIPE, sigpipe_handler);
 
+	/* there needs to be a better way to do this */
 	while (1) {
 		if (WaitForSingleObject(exit_event, 10) != WAIT_TIMEOUT)
 			break;
