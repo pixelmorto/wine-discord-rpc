@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This is a program built for Wine that gives the ability for other Wine processes to communicate with your native Discord client.
+This is a program built for Wine that gives the ability for other Wine processes to communicate with your native Discord client. This works with programs that are either dynamically or statically linked against discord-rpc or discord-game-sdk libraries.
 
 ## Compilation
 
