@@ -30,11 +30,21 @@ There needs to be an existing Wine installation with winegcc and multilib suppor
 
 ## How to use
 
-Run this script:
+Run the script with your `WINEPREFIX` set (`~/.wine` is an example):
 ```
 WINEPREFIX=~/.wine setup-wine-discord-rpc install
 ```
 This will create the required registry key and symlinks for Discord RPC to work.
+
+For Proton prefixes, run the script with your `wine_path` set appropriately to a Proton installation and find a Proton game's AppID in your SteamLibrary compatdata folder. `steamapps/compatdata/appid`.
+```
+$ export wine_path=~/.steam/steam/steamapps/common/[YOUR_PROTON_HERE]/dist/bin
+OR
+$ export wine_path=~/.steam/steam/compatibilitytools.d/[YOUR_PROTON_HERE]/dist/bin
+
+$ export WINEPREFIX=~/.steam/steam/steamapps/compatdata/[APPID_HERE]/pfx
+$ setup-wine-discord-rpc install
+```
 
 ## Improvements
 
@@ -42,7 +52,6 @@ Feel free to send pull requests and/or raise issues if things are not working pr
 
 ## TODO
 
-- Create a patch for proton that does the how-to automatically
 - make a PKGBUILD
 - better ways to update the rpc
 

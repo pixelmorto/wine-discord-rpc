@@ -31,7 +31,9 @@ fi
 export WINEDEBUG=-all
 wine_bin="wine"
 wine64_bin="wine64"
-wine_path=$(dirname "$(which wineboot)")
+if [ -z "$wine_path" ]; then
+	wine_path=$(dirname "$(which wineboot)")
+fi
 
 if [ ! -f "$wine_path/$wine_bin" ]; then
 	wine_bin="$wine64_bin"

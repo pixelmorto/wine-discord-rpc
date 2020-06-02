@@ -24,7 +24,7 @@ install: all
 	cp -v wine-discord-rpc.win64.exe.so $(INSTALLDIR)/
 	cp -v wine-discord-rpc.win32.exe.so $(INSTALLDIR)/
 	cp -v setup-wine-discord-rpc.sh $(INSTALLDIR)/
-	ln -v -s $(INSTALLDIR)/setup-wine-discord-rpc.sh $(BINDIR)/setup-wine-discord-rpc
+	ln -v -s -f $(INSTALLDIR)/setup-wine-discord-rpc.sh $(BINDIR)/setup-wine-discord-rpc
 
 uninstall:
 	rm -v $(INSTALLDIR)/wine-discord-rpc.win64.exe.so $(INSTALLDIR)/wine-discord-rpc.win32.exe.so $(INSTALLDIR)/setup-wine-discord-rpc.sh $(BINDIR)/setup-wine-discord-rpc
