@@ -17,6 +17,9 @@
 #include <errno.h>
 #include <signal.h>
 
+/* 256 KiB */
+#define BUFSIZE 256*1024
+
 extern HANDLE CDECL __wine_make_process_system(void);
 
 WINE_DEFAULT_DEBUG_CHANNEL(discord);
@@ -46,8 +49,8 @@ int CDECL main(void)
 	HANDLE exit_event;
 	DWORD bytes_avail, bytes_read;
 	ssize_t fd_read;
-	char buf[65536];
-	int optval = sizeof(buf);
+	char *buf;
+	int optval = BUFSIZE;
 
 	/* the interfaces to and from unix side */
 	HANDLE pipe = INVALID_HANDLE_VALUE;
@@ -56,6 +59,11 @@ int CDECL main(void)
 	struct sockaddr_un sun;
 
 	WINE_TRACE("starting discord-ipc-0 emulation\n");
+
+	if ((buf = HeapAlloc(GetProcessHeap(), 0, BUFSIZE)) == NULL) {
+		WINE_TRACE("exiting, cannot allocate %d byte buffer\n", BUFSIZE);
+		return 1;
+	}
 
 	exit_event = __wine_make_process_system();
 
@@ -66,7 +74,7 @@ int CDECL main(void)
 
 	/* there needs to be a better way to do this */
 	while (1) {
-		if (WaitForSingleObject(exit_event, 10) != WAIT_TIMEOUT)
+		if (WaitForSingleObject(exit_event, 20) != WAIT_TIMEOUT)
 			break;
 
 		if (fd == -1) {
@@ -91,8 +99,8 @@ retry_connection:
 					PIPE_ACCESS_DUPLEX | FILE_FLAG_FIRST_PIPE_INSTANCE,
 					PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_NOWAIT,
 					1,
-					sizeof(buf),
-					sizeof(buf),
+					BUFSIZE,
+					BUFSIZE,
 					0,
 					NULL)) == INVALID_HANDLE_VALUE) {
 				close(fd);
@@ -103,7 +111,7 @@ retry_connection:
 		}
 
 		if (PeekNamedPipe(pipe, NULL, 0, NULL, &bytes_avail, NULL)) {
-			if (ReadFile(pipe, buf, sizeof(buf), &bytes_read, NULL)) {
+			if (ReadFile(pipe, buf, BUFSIZE, &bytes_read, NULL)) {
 				if (send(fd, buf, bytes_read, 0) == -1) {
 disconnected_from_unix:
 					WINE_TRACE("disconnected? attempt to reconnect\n");
@@ -116,7 +124,7 @@ disconnected_from_unix:
 			}
 		}
 
-		if ((fd_read = recv(fd, buf, sizeof(buf), 0)) > 0) {
+		if ((fd_read = recv(fd, buf, BUFSIZE, 0)) > 0) {
 			WriteFile(pipe, buf, fd_read, &bytes_read, NULL);
 		} else {
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
@@ -127,6 +135,8 @@ disconnected_from_unix:
 	}
 
 	WINE_TRACE("closing up\n");
+
+	HeapFree(GetProcessHeap(), 0, buf);
 
 	if (pipe != INVALID_HANDLE_VALUE)
 		CloseHandle(pipe);

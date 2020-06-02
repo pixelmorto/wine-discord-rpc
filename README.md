@@ -6,14 +6,35 @@ This is a program built for Wine that gives the ability for other Wine processes
 
 ## Compilation
 
-Compile using winegcc
+Compile by doing:
+```
+make
+```
+
+To install system-wide:
+```
+sudo make install
+```
+
+To uninstall system-wide:
+```
+sudo make uninstall
+```
+
+To install for a package (on Arch Linux as an example):
+```
+DESTDIR=${pkgdir} make install
+```
+
+There needs to be an existing Wine installation with winegcc and multilib support!
 
 ## How to use
 
-This can be ran like so:
+Run this script:
 ```
-wine wine-discord-rpc.exe.so & sleep 1 && wine app_name_here.exe
+WINEPREFIX=~/.wine setup-wine-discord-rpc install
 ```
+This will create the required registry key and symlinks for Discord RPC to work.
 
 ## Improvements
 
@@ -21,9 +42,8 @@ Feel free to send pull requests and/or raise issues if things are not working pr
 
 ## TODO
 
-- Create a patch for proton that launches this program in the background
-- Create a shell script that launches the program in the background and then launch the user specified program
-- Bigger buffer size (is it needed?)
+- Create a patch for proton that does the how-to automatically
+- make a PKGBUILD
 - better ways to update the rpc
 
 ## License
